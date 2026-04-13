@@ -1,3 +1,10 @@
 spring:
   application:
     name: pricing-engine-retail
+
+logging:
+  level:
+    root: INFO
+    com.bcnc.challenge.pricing: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{correlationId}] %logger{36} - %msg%n"
