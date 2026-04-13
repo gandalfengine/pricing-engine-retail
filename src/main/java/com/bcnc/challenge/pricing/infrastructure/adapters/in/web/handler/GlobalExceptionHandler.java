@@ -1,8 +1,10 @@
 package com.bcnc.challenge.pricing.infrastructure.adapters.in.web.handler;
 
+import com.bcnc.challenge.pricing.application.exceptions.ApplicablePriceNotFoundException;
 import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.response.ApiErrorResponse;
 import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.response.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -62,6 +64,44 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         return badRequest("Invalid request", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConstraintViolation(
+            ConstraintViolationException ex,
+            HttpServletRequest request
+    ) {
+        String detail = ex.getConstraintViolations().stream()
+                .findFirst()
+                .map(violation -> {
+                    String path = violation.getPropertyPath().toString();
+                    String field = path.substring(path.lastIndexOf('.') + 1);
+                    return "Invalid value for parameter: " + field;
+                })
+                .orElse("Invalid request");
+
+        return badRequest("Invalid request", detail, request);
+    }
+
+    @ExceptionHandler(ApplicablePriceNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleApplicablePriceNotFound(
+            ApplicablePriceNotFoundException ex,
+            HttpServletRequest request
+    ) {
+        String correlationId = (String) request.getAttribute(CORRELATION_ID_KEY);
+
+        log.warn("Applicable price not found. correlationId={}, detail={}", correlationId, ex.getMessage());
+
+        ApiErrorResponse error = new ApiErrorResponse(
+                "about:blank",
+                "Resource not found",
+                HttpStatus.NOT_FOUND.value(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.failure("Resource not found", correlationId, error));
     }
 
     @ExceptionHandler(Exception.class)
