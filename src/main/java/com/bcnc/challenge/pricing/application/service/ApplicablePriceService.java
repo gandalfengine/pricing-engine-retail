@@ -5,16 +5,14 @@ import com.bcnc.challenge.pricing.application.ports.in.GetApplicablePriceUseCase
 import com.bcnc.challenge.pricing.application.ports.out.LoadApplicablePricePort;
 import com.bcnc.challenge.pricing.domain.model.Price;
 import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.response.ApplicablePriceResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 
+@Slf4j
 @Service
 public class ApplicablePriceService implements GetApplicablePriceUseCase {
-
-    private static final Logger log = LoggerFactory.getLogger(ApplicablePriceService.class);
 
     private final LoadApplicablePricePort loadApplicablePricePort;
 
@@ -28,30 +26,32 @@ public class ApplicablePriceService implements GetApplicablePriceUseCase {
             Long productId,
             Long brandId
     ) {
-        log.info(
-                "Searching applicable price. applicationDate={}, productId={}, brandId={}",
-                applicationDate,
-                productId,
-                brandId
-        );
+        validateInput(applicationDate, productId, brandId);
+
+        log.info("Searching applicable price. applicationDate={}, productId={}, brandId={}",
+                applicationDate, productId, brandId);
 
         Price price = loadApplicablePricePort
                 .loadApplicablePrice(applicationDate, productId, brandId)
-                .orElseThrow(() -> {
-                    log.warn(
-                            "No applicable price found. applicationDate={}, productId={}, brandId={}",
-                            applicationDate,
-                            productId,
-                            brandId
-                    );
-                    return new ApplicablePriceNotFoundException(
-                            "No applicable price found for productId=%d, brandId=%d, applicationDate=%s"
-                                    .formatted(productId, brandId, applicationDate)
-                    );
-                });
+                .orElseThrow(() -> notFound(applicationDate, productId, brandId));
 
         log.info("Applicable price found. price={}", price);
 
+        return toResponse(price);
+    }
+
+    private ApplicablePriceNotFoundException notFound(
+            LocalDateTime applicationDate, Long productId, Long brandId) {
+
+        log.warn("No applicable price found. applicationDate={}, productId={}, brandId={}",
+                applicationDate, productId, brandId);
+
+        return new ApplicablePriceNotFoundException(
+                "No applicable price found for productId=%d, brandId=%d, applicationDate=%s"
+                        .formatted(productId, brandId, applicationDate));
+    }
+
+    private static ApplicablePriceResponse toResponse(Price price) {
         return new ApplicablePriceResponse(
                 price.product().id(),
                 price.brand().id(),
@@ -60,5 +60,13 @@ public class ApplicablePriceService implements GetApplicablePriceUseCase {
                 price.endDate(),
                 price.amount()
         );
+    }
+
+    private static void validateInput(LocalDateTime applicationDate, Long productId, Long brandId) {
+        if (applicationDate == null) throw new IllegalArgumentException("applicationDate must not be null");
+        if (productId == null)       throw new IllegalArgumentException("productId must not be null");
+        if (brandId == null)         throw new IllegalArgumentException("brandId must not be null");
+        if (productId <= 0)          throw new IllegalArgumentException("productId must be greater than zero");
+        if (brandId <= 0)            throw new IllegalArgumentException("brandId must be greater than zero");
     }
 }
