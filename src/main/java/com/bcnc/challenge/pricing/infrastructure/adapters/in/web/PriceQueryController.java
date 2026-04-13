@@ -37,7 +37,7 @@ public class PriceQueryController {
             @Validated @ModelAttribute ApplicablePriceCriteria criteria,
             @RequestAttribute(CORRELATION_ID_KEY) String correlationId
     ) {
-        log.info("Price query received. correlationId={}, criteria={}", correlationId, criteria);
+        log.info("Price query received. criteria={}", criteria);
 
         var response = getApplicablePriceUseCase.execute(
                 criteria.applicationDate(),
@@ -46,8 +46,7 @@ public class PriceQueryController {
         );
 
         log.info(
-                "Price query processed successfully. correlationId={}, productId={}, brandId={}, priceList={}",
-                correlationId,
+                "Price query processed successfully. productId={}, brandId={}, priceList={}",
                 response.productId(),
                 response.brandId(),
                 response.priceList()

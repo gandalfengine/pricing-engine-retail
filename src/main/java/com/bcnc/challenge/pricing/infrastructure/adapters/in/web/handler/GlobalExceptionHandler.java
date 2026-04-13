@@ -90,7 +90,7 @@ public class GlobalExceptionHandler {
     ) {
         String correlationId = (String) request.getAttribute(CORRELATION_ID_KEY);
 
-        log.warn("Applicable price not found. correlationId={}, detail={}", correlationId, ex.getMessage());
+        log.warn("Applicable price not found. detail={}", ex.getMessage());
 
         ApiErrorResponse error = new ApiErrorResponse(
                 "about:blank",

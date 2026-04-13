@@ -1,22 +1,18 @@
 package com.bcnc.challenge.pricing.domain.model;
 
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public record Price(
-        Long productId,
-        Long brandId,
+        Long id,
+        Brand brand,
+        Product product,
         Integer priceList,
         Integer priority,
         LocalDateTime startDate,
         LocalDateTime endDate,
-        BigDecimal price
+        BigDecimal amount,
+        Currency currency,
+        AuditMetadata auditMetadata
 ) {
-    public boolean isApplicableAt(LocalDateTime date) {
-        return (date.isEqual(startDate) || date.isAfter(startDate)) &&
-                (date.isBefore(endDate) || date.isEqual(endDate));
-    }
 }
