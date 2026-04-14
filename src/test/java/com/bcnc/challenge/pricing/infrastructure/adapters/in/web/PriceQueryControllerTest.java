@@ -5,7 +5,6 @@ import com.bcnc.challenge.pricing.application.ports.in.GetApplicablePriceUseCase
 import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.filter.CorrelationIdFilter;
 import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.handler.GlobalExceptionHandler;
 import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.response.ApplicablePriceResponse;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -326,28 +325,6 @@ class PriceQueryControllerTest {
         assertUnexpectedErrorLog(output, correlationId);
     }
 
-    @Disabled
-    @Test
-    void shouldGenerateCorrelationIdWhenHeaderIsNotProvided() throws Exception {
-        when(getApplicablePriceUseCase.execute(any(), anyLong(), anyLong()))
-                .thenReturn(new ApplicablePriceResponse(
-                        35455L,
-                        1L,
-                        1,
-                        LocalDateTime.of(2020, 6, 14, 0, 0),
-                        LocalDateTime.of(2020, 12, 31, 23, 59, 59),
-                        new BigDecimal("35.50")
-                ));
-
-        mockMvc.perform(get("/api/prices")
-                        .param("applicationDate", "2020-06-14T10:00:00")
-                        .param("productId", "35455")
-                        .param("brandId", "1"))
-                .andExpect(status().isOk())
-                .andExpect(header().exists("X-Correlation-Id"));
-    }
-
-    @Disabled
     @Test
     void shouldReturnProvidedCorrelationIdInResponseHeader() throws Exception {
         when(getApplicablePriceUseCase.execute(any(), anyLong(), anyLong()))
@@ -360,7 +337,7 @@ class PriceQueryControllerTest {
                         new BigDecimal("35.50")
                 ));
 
-        mockMvc.perform(get("/api/prices")
+        mockMvc.perform(get("/api/v1/prices")
                         .param("applicationDate", "2020-06-14T10:00:00")
                         .param("productId", "35455")
                         .param("brandId", "1")

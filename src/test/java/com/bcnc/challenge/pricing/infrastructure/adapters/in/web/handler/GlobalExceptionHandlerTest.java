@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 class GlobalExceptionHandlerTest {
 
+    public static final String REQUEST_URI_V1_PRICES = "/api/v1/prices";
     private GlobalExceptionHandler globalExceptionHandler;
     private MockHttpServletRequest request;
 
@@ -36,7 +37,7 @@ class GlobalExceptionHandlerTest {
         globalExceptionHandler = new GlobalExceptionHandler();
 
         request = new MockHttpServletRequest();
-        request.setRequestURI("/api/prices");
+        request.setRequestURI(REQUEST_URI_V1_PRICES);
         request.setAttribute(CORRELATION_ID_KEY, "test-correlation-id");
     }
 
@@ -57,7 +58,7 @@ class GlobalExceptionHandlerTest {
         assertEquals("Invalid request", error.get("title"));
         assertEquals(400, error.get("status"));
         assertEquals("Missing required request parameter: applicationDate", error.get("detail"));
-        assertEquals("/api/prices", error.get("instance"));
+        assertEquals(REQUEST_URI_V1_PRICES, error.get("instance"));
     }
 
     @Test
@@ -82,7 +83,7 @@ class GlobalExceptionHandlerTest {
         assertEquals("Invalid request", error.get("title"));
         assertEquals(400, error.get("status"));
         assertEquals("Invalid value for parameter: applicationDate", error.get("detail"));
-        assertEquals("/api/prices", error.get("instance"));
+        assertEquals(REQUEST_URI_V1_PRICES, error.get("instance"));
     }
 
     @Test
@@ -104,7 +105,7 @@ class GlobalExceptionHandlerTest {
         assertEquals("Invalid request", error.get("title"));
         assertEquals(400, error.get("status"));
         assertEquals("Invalid value for parameter: productId", error.get("detail"));
-        assertEquals("/api/prices", error.get("instance"));
+        assertEquals(REQUEST_URI_V1_PRICES, error.get("instance"));
     }
 
     @Getter
@@ -133,7 +134,7 @@ class GlobalExceptionHandlerTest {
         assertEquals("Invalid request", error.get("title"));
         assertEquals(400, error.get("status"));
         assertEquals("Missing request header 'X-Correlation-Id'", error.get("detail"));
-        assertEquals("/api/prices", error.get("instance"));
+        assertEquals(REQUEST_URI_V1_PRICES, error.get("instance"));
     }
 
     @Test
@@ -159,7 +160,7 @@ class GlobalExceptionHandlerTest {
         assertEquals("Invalid request", error.get("title"));
         assertEquals(400, error.get("status"));
         assertEquals("Invalid value for parameter: productId", error.get("detail"));
-        assertEquals("/api/prices", error.get("instance"));
+        assertEquals(REQUEST_URI_V1_PRICES, error.get("instance"));
     }
 
     @Test
@@ -179,7 +180,7 @@ class GlobalExceptionHandlerTest {
         assertEquals("Resource not found", error.get("title"));
         assertEquals(404, error.get("status"));
         assertEquals("No applicable price found for productId=35455", error.get("detail"));
-        assertEquals("/api/prices", error.get("instance"));
+        assertEquals(REQUEST_URI_V1_PRICES, error.get("instance"));
     }
 
     @Test
@@ -198,13 +199,13 @@ class GlobalExceptionHandlerTest {
         assertEquals("Internal server error", error.get("title"));
         assertEquals(500, error.get("status"));
         assertEquals("An unexpected error occurred", error.get("detail"));
-        assertEquals("/api/prices", error.get("instance"));
+        assertEquals(REQUEST_URI_V1_PRICES, error.get("instance"));
     }
 
     @Test
     void shouldHandleBadRequestWithoutCorrelationId() throws Exception {
         MockHttpServletRequest requestWithoutCorrelationId = new MockHttpServletRequest();
-        requestWithoutCorrelationId.setRequestURI("/api/prices");
+        requestWithoutCorrelationId.setRequestURI(REQUEST_URI_V1_PRICES);
 
         MissingServletRequestParameterException ex =
                 new MissingServletRequestParameterException("brandId", "Long");
