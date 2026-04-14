@@ -252,10 +252,9 @@ class PriceJpaRepositoryTest {
             LocalDateTime applicationDate
     ) {
         return priceJpaRepository
-                .findTopByProduct_IdAndBrand_IdAndStartDateLessThanEqualAndEndDateGreaterThanEqualAndActiveTrueOrderByPriorityDesc(
+                .findApplicablePrice(
                         productId,
                         brandId,
-                        applicationDate,
                         applicationDate
                 );
     }

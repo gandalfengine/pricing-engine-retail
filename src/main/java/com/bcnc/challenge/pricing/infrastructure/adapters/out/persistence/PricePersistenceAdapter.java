@@ -8,10 +8,13 @@ import com.bcnc.challenge.pricing.domain.model.Price;
 import com.bcnc.challenge.pricing.domain.model.Product;
 import com.bcnc.challenge.pricing.infrastructure.adapters.out.persistence.entity.PriceEntity;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+
+import static com.bcnc.challenge.pricing.infrastructure.config.CacheConfig.APPLICABLE_PRICE_CACHE;
 
 @Slf4j
 @Component
@@ -24,23 +27,27 @@ public class PricePersistenceAdapter implements LoadApplicablePricePort {
     }
 
     @Override
+    @Cacheable(
+            cacheNames = APPLICABLE_PRICE_CACHE,
+            key = "T(com.bcnc.challenge.pricing.infrastructure.config.CacheKeyFactory).applicablePriceKey(#applicationDate, #productId, #brandId)",
+            unless = "#result == null"
+    )
     public Optional<Price> loadApplicablePrice(
             LocalDateTime applicationDate,
             Long productId,
             Long brandId
     ) {
         log.info(
-                "Loading applicable price from persistence. applicationDate={}, productId={}, brandId={}",
+                "Cache miss. Loading applicable price from persistence. applicationDate={}, productId={}, brandId={}",
                 applicationDate,
                 productId,
                 brandId
         );
 
         return priceJpaRepository
-                .findTopByProduct_IdAndBrand_IdAndStartDateLessThanEqualAndEndDateGreaterThanEqualAndActiveTrueOrderByPriorityDesc(
+                .findApplicablePrice(
                         productId,
                         brandId,
-                        applicationDate,
                         applicationDate
                 )
                 .map(this::toDomain);
