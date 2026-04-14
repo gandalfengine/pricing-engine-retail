@@ -2,6 +2,8 @@
 
 Backend service built with **Java 21** and **Spring Boot 3.3.5**, designed to resolve the applicable retail price for a given date, product, and brand — following **Hexagonal Architecture** and **Domain-Driven Design**.
 
+Current project version: **0.1.0-SNAPSHOT**
+
 ---
 
 ## Table of Contents
@@ -10,10 +12,11 @@ Backend service built with **Java 21** and **Spring Boot 3.3.5**, designed to re
 - [Architecture](#architecture)
 - [Data Model](#data-model)
 - [API Reference](#api-reference)
+- [Configuration by Environment](#configuration-by-environment)
 - [Performance & Observability](#performance--observability)
 - [Getting Started](#getting-started)
 - [Running Tests](#running-tests)
-- [Test Coverage](#test-coverage)
+- [Build and Run](#build-and-run)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 
@@ -33,7 +36,7 @@ Given an application date, a product ID, and a brand ID, the service returns the
 
 The project follows the **Hexagonal Architecture (Ports & Adapters)** pattern, ensuring complete independence between business logic, application orchestration, and infrastructure concerns.
 
-```
+```text
 ┌────────────────────────────────────────────────────────────┐
 │                    infrastructure / adapters               │
 │                                                            │
@@ -68,7 +71,7 @@ The project follows the **Hexagonal Architecture (Ports & Adapters)** pattern, e
 | `domain.model` | Rich domain records with invariant enforcement (`Price`, `Brand`, `Product`, `Currency`, `AuditMetadata`) |
 | `application.ports.in` | Inbound port — defines the use case contract (`GetApplicablePriceUseCase`) |
 | `application.ports.out` | Outbound port — defines the persistence contract (`LoadApplicablePricePort`) |
-| `application.result` | Use case output type (`ApplicablePriceResult`) — belongs to the application layer, not to infrastructure |
+| `application.result` | Use case output type (`ApplicablePriceResult`) |
 | `application.service` | Use case implementation — orchestrates domain logic and delegates persistence via port |
 | `application.exceptions` | Domain-level exceptions (`ApplicablePriceNotFoundException`) |
 | `infrastructure.adapters.in.web` | REST controller, request criteria record, and response mapping |
@@ -131,11 +134,34 @@ erDiagram
     CURRENCIES ||--o{ PRICES : uses
 ```
 
-**Index strategy:** a composite index is created at startup to support the primary query pattern:
+**Index strategy:** a composite index is created to support the primary query pattern:
 
-- `idx_prices_search` on `(brand_id, product_id, active, start_date, end_date, priority)` — covers filtering, active flag, date range, and priority ordering in a single index scan.
+- `idx_prices_search` on `(brand_id, product_id, active, start_date, end_date, priority)`
 
-The database is an **H2 in-memory instance** initialised at startup from `schema.sql` and `data.sql`. Seed data includes 4 brands (ZARA, PULL\_AND\_BEAR, MASSIMO\_DUTTI, BERSHKA), 4 products, 4 currencies, and 23 price records across multiple overlapping windows.
+### Database initialization
+
+The application now uses **Flyway** to version and execute database migrations.
+
+Migration files are located at:
+
+```text
+src/main/resources/db/migration
+```
+
+Current migrations:
+
+- `V1__create_pricing_schema.sql`
+- `V2__seed_pricing_data.sql`
+
+Flyway stores execution history in the `flyway_schema_history` table.
+
+Useful query:
+
+```sql
+SELECT * FROM flyway_schema_history ORDER BY installed_rank;
+```
+
+In the `dev` profile, the application uses an **H2 in-memory database**, so migrations are executed on every startup because the database is recreated each time the process starts.
 
 ---
 
@@ -143,11 +169,11 @@ The database is an **H2 in-memory instance** initialised at startup from `schema
 
 ### Get applicable price
 
-```
+```text
 GET /api/v1/prices
 ```
 
-#### Query parameters
+### Query parameters
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -157,7 +183,7 @@ GET /api/v1/prices
 
 All three parameters are mandatory. Missing or invalid values return `400 Bad Request`.
 
-#### Success response — `200 OK`
+### Success response — `200 OK`
 
 ```json
 {
@@ -174,7 +200,7 @@ All three parameters are mandatory. Missing or invalid values return `400 Bad Re
 }
 ```
 
-#### Error response — `400 Bad Request`
+### Error response — `400 Bad Request`
 
 ```json
 {
@@ -190,7 +216,7 @@ All three parameters are mandatory. Missing or invalid values return `400 Bad Re
 }
 ```
 
-#### Error response — `404 Not Found`
+### Error response — `404 Not Found`
 
 ```json
 {
@@ -206,45 +232,65 @@ All three parameters are mandatory. Missing or invalid values return `400 Bad Re
 }
 ```
 
-#### Correlation ID
+### Correlation ID
 
-Every request and response carries a correlation ID for distributed tracing. Pass `X-Correlation-Id` in the request header to propagate your own ID; if omitted, one is generated automatically and returned in the response header.
+Every request and response carries a correlation ID for traceability. Pass `X-Correlation-Id` in the request header to propagate your own ID; if omitted, one is generated automatically and returned in the response header.
 
 ```bash
-curl -H "X-Correlation-Id: my-trace-id-123" \
-  "http://localhost:8080/api/v1/prices?applicationDate=2020-06-14T10:00:00&productId=35455&brandId=1"
+curl -H "X-Correlation-Id: my-trace-id-123"   "http://localhost:8080/api/v1/prices?applicationDate=2020-06-14T10:00:00&productId=35455&brandId=1"
 ```
 
-#### Example requests
-
-The five mandatory test scenarios from the challenge specification:
+### Example requests
 
 ```bash
-# Test 1 — 2020-06-14 at 10:00 → price list 1 (35.50 EUR) — base price, no overlap
 curl "http://localhost:8080/api/v1/prices?applicationDate=2020-06-14T10:00:00&productId=35455&brandId=1"
-
-# Test 2 — 2020-06-14 at 16:00 → price list 2 (25.45 EUR) — promotional window, higher priority wins
 curl "http://localhost:8080/api/v1/prices?applicationDate=2020-06-14T16:00:00&productId=35455&brandId=1"
-
-# Test 3 — 2020-06-14 at 21:00 → price list 1 (35.50 EUR) — promotional window closed, base price resumes
 curl "http://localhost:8080/api/v1/prices?applicationDate=2020-06-14T21:00:00&productId=35455&brandId=1"
-
-# Test 4 — 2020-06-15 at 10:00 → price list 3 (30.50 EUR) — new promotional window
 curl "http://localhost:8080/api/v1/prices?applicationDate=2020-06-15T10:00:00&productId=35455&brandId=1"
-
-# Test 5 — 2020-06-16 at 21:00 → price list 4 (38.95 EUR) — long-running promotion active
 curl "http://localhost:8080/api/v1/prices?applicationDate=2020-06-16T21:00:00&productId=35455&brandId=1"
 ```
 
-#### H2 Console
+### H2 Console
 
-Available at `http://localhost:8080/h2-console` while the application is running.
+Available only in the `dev` profile at:
+
+```text
+http://localhost:8080/h2-console
+```
 
 | Field | Value |
 |---|---|
 | JDBC URL | `jdbc:h2:mem:pricingdb` |
 | Username | `sa` |
-| Password | *(empty)* |
+| Password | *(empty by default)* |
+
+---
+
+## Configuration by Environment
+
+The project is now organised by Spring profiles:
+
+- `application.yaml` → shared base configuration
+- `application-dev.yaml` → local development
+- `application-hom.yaml` → homologation
+- `application-prod.yaml` → production
+
+### Environment variables
+
+The application supports environment variables for database configuration.
+
+Examples:
+
+- `DB_URL`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+- `DB_DRIVER`
+- `DB_POOL_MAX_SIZE`
+- `DB_POOL_MIN_IDLE`
+- `DB_CONNECTION_TIMEOUT`
+- `DB_IDLE_TIMEOUT`
+
+For local development, default values are already provided in the `dev` profile when possible.
 
 ---
 
@@ -257,15 +303,13 @@ Applicable price lookups are cached at the persistence adapter level using **Caf
 | Setting | Value |
 |---|---|
 | Cache name | `applicable-price` |
-| Key | `applicationDate\|productId\|brandId` |
+| Key | `applicationDate|productId|brandId` |
 | Max size | 1,000 entries |
 | Expiration | 1 minute after write |
 
-Cache behaviour is verified by an integration test (`PricePersistenceAdapterCacheIT`) that asserts the JPA repository is called only once for repeated identical requests.
-
 ### Query Optimisation
 
-The price lookup uses a **native SQL query** rather than a derived JPQL method. This gives full control over filtering, ordering, and index alignment, and makes the execution plan predictable regardless of JPA provider version.
+The price lookup uses a **native SQL query** rather than a derived JPA method. This gives full control over filtering, ordering, and index alignment.
 
 ```sql
 SELECT p.*
@@ -281,7 +325,7 @@ LIMIT 1
 
 ### Observability (Micrometer + Actuator)
 
-Metrics are collected at the service layer (`ApplicablePriceService`) to capture real business execution behaviour.
+Metrics are collected at the service layer to capture business execution behaviour.
 
 | Metric | Description |
 |---|---|
@@ -289,22 +333,26 @@ Metrics are collected at the service layer (`ApplicablePriceService`) to capture
 | `pricing.applicable_price.found` | Requests that returned a price |
 | `pricing.applicable_price.not_found` | Requests with no applicable price |
 | `pricing.applicable_price.validation_error` | Requests rejected due to invalid input |
-| `pricing.applicable_price.execution` | Execution time of the use case (timer) |
+| `pricing.applicable_price.execution` | Execution time of the use case |
 
-**Actuator endpoints:**
+### Actuator endpoints
 
-```bash
-GET /actuator/health
-GET /actuator/metrics
-GET /actuator/metrics/pricing.applicable_price.execution
-GET /actuator/caches
+Base path:
+
+```text
+/manage
 ```
 
-Example:
+Examples:
 
 ```bash
-curl http://localhost:8080/actuator/metrics/pricing.applicable_price.execution
+curl http://localhost:8080/manage/health
+curl http://localhost:8080/manage/metrics
+curl http://localhost:8080/manage/metrics/pricing.applicable_price.execution
+curl http://localhost:8080/manage/caches
 ```
+
+Endpoint exposure varies by profile.
 
 ---
 
@@ -315,68 +363,100 @@ curl http://localhost:8080/actuator/metrics/pricing.applicable_price.execution
 - Java 21+
 - Maven 3.8+
 
-### Clone and run
+### Clone the project
 
 ```bash
 git clone https://github.com/gandalfengine/pricing-engine-retail.git
 cd pricing-engine-retail
-./mvnw spring-boot:run
-```
-
-The application starts on port `8080`. The H2 database is initialised automatically with seed data on every startup.
-
-### Build
-
-```bash
-./mvnw clean package
-java -jar target/pricing-engine-retail-0.0.1-SNAPSHOT.jar
 ```
 
 ---
 
 ## Running Tests
 
+Because the project now uses profile-based configuration, tests should be executed with the appropriate Spring profile.
+
+### Run all tests
+
 ```bash
-# Run all tests
-./mvnw test
-
-# Run tests and generate JaCoCo coverage report
-./mvnw verify
-
-# Open coverage report
-open target/site/jacoco/index.html
+./mvnw clean test -Dspring.profiles.active=dev
 ```
+
+or
+
+```bash
+SPRING_PROFILES_ACTIVE=dev ./mvnw clean test
+```
+
+### Run tests with verification and JaCoCo report
+
+```bash
+./mvnw clean verify -Dspring.profiles.active=dev
+```
+
+or
+
+```bash
+SPRING_PROFILES_ACTIVE=dev ./mvnw clean verify
+```
+
+JaCoCo runs in the `verify` phase.
 
 ---
 
-## Test Coverage
+## Build and Run
 
-**100% across all metrics** — verified with JaCoCo 0.8.11.
+### Build the application
 
-| Layer | Classes | Methods | Lines | Branches |
-|---|---|---|---|---|
-| `application` | 100% | 100% | 100% | 100% |
-| `domain.model` | 100% | 100% | 100% | 100% |
-| `infrastructure.adapters` | 100% | 100% | 100% | 100% |
-| **Total** | **100%** | **100%** | **100%** | **100%** |
+```bash
+./mvnw clean package -Dspring.profiles.active=dev
+```
 
-### Test strategy
+or
 
-The suite is structured in six independent layers, each with a distinct scope and purpose.
+```bash
+SPRING_PROFILES_ACTIVE=dev ./mvnw clean package
+```
 
-**Domain tests** (`PriceTest`) validate invariants enforced in the `Price` compact constructor: null fields, invalid date ranges, and correct state exposure via record accessors.
+### Generated artifact
 
-**Use case tests** (`ApplicablePriceServiceTest`) are pure unit tests with Mockito. They cover correct mapping from `Price` to `ApplicablePriceResult`, argument propagation to the outbound port, exception message content, `BigDecimal` precision preservation, and all input validation branches.
+The final artifact is generated as:
 
-**Telemetry tests** (`ApplicablePriceServiceTelemetryTest`) validate correct metric emission using `SimpleMeterRegistry`, ensuring accurate tracking of request volume, outcomes, and execution time without coupling to infrastructure.
+```text
+target/pricing-engine-retail.jar
+```
 
-**Controller tests** (`PriceQueryControllerTest`) use `MockMvc` with `@WebMvcTest`. They cover all HTTP status codes (200, 400, 404, 500), parameter validation (missing, invalid format, zero, negative), `X-Correlation-Id` propagation, and structured log output via `OutputCaptureExtension`.
+### Run with `dev` profile
 
-**Persistence adapter tests** (`PricePersistenceAdapterTest`) verify entity-to-domain mapping using Mockito mocks — brand, product, currency, audit metadata, and inactive flag are all asserted.
+```bash
+java -jar target/pricing-engine-retail.jar --spring.profiles.active=dev
+```
 
-**Cache integration tests** (`PricePersistenceAdapterCacheIT`) run with `@SpringBootTest` and a mocked repository to assert that the cache is hit on the second call, with the JPA layer invoked only once.
+### Run with `hom` profile
 
-**JPA repository tests** (`PriceJpaRepositoryTest`) run against a real H2 instance with `@DataJpaTest`. They cover the five mandatory challenge scenarios, plus boundary conditions: inclusive start/end dates, inactive price exclusion via `@Sql`, fallback to base price after a promotional window closes, and empty results for unknown combinations.
+```bash
+java -jar target/pricing-engine-retail.jar --spring.profiles.active=hom
+```
+
+### Run with `prod` profile
+The prod profile requires database connection variables to be provided explicitly.
+```bash
+DB_URL="jdbc:h2:mem:pricingdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE" \
+DB_DRIVER="org.h2.Driver" \
+DB_USERNAME="sa" \
+DB_PASSWORD="" \
+DB_POOL_MAX_SIZE="5" \
+DB_POOL_MIN_IDLE="1" \
+DB_CONNECTION_TIMEOUT="30000" \
+DB_IDLE_TIMEOUT="600000" \
+java -jar target/pricing-engine-retail.jar --spring.profiles.active=prod
+```
+Example above uses H2 only to validate the prod profile locally. In a real production environment, these values should point to the actual database and driver.
+### Run directly with Spring Boot
+
+```bash
+SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
+```
 
 ---
 
@@ -386,9 +466,10 @@ The suite is structured in six independent layers, each with a distinct scope an
 |---|---|
 | Language | Java 21 |
 | Framework | Spring Boot 3.3.5 |
-| Persistence | Spring Data JPA + H2 (in-memory) |
+| Persistence | Spring Data JPA + H2 |
+| Database migrations | Flyway |
 | Caching | Caffeine |
-| Validation | Jakarta Validation (`@NotNull`, `@Positive`) |
+| Validation | Jakarta Validation |
 | Logging | SLF4J + Logback with MDC correlation tracking |
 | Observability | Micrometer + Spring Boot Actuator |
 | Boilerplate reduction | Lombok |
@@ -400,7 +481,7 @@ The suite is structured in six independent layers, each with a distinct scope an
 
 ## Project Structure
 
-```
+```text
 src/
 ├── main/
 │   ├── java/com/bcnc/challenge/pricing/
@@ -444,8 +525,13 @@ src/
 │   │           └── CacheKeyFactory.java
 │   └── resources/
 │       ├── application.yaml
-│       ├── data.sql
-│       └── schema.sql
+│       ├── application-dev.yaml
+│       ├── application-hom.yaml
+│       ├── application-prod.yaml
+│       └── db/
+│           └── migration/
+│               ├── V1__create_pricing_schema.sql
+│               └── V2__seed_pricing_data.sql
 └── test/
     └── java/com/bcnc/challenge/pricing/
         ├── PricingEngineRetailApplicationTest.java

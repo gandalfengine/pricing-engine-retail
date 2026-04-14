@@ -1,0 +1,44 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:h2:mem:pricingdb_hom;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    driver-class-name: org.h2.Driver
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
+    Hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      pool-name: pricing-hikari-hom
+
+  h2:
+    console:
+      enabled: false
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+      data-locations: classpath:data.sql
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+management:
+  info:
+    env:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,caches
+
+logging:
+  level:
+    root: INFO
+    com.bcnc.challenge.pricing: INFO
