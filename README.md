@@ -79,6 +79,60 @@ The project follows the **Hexagonal Architecture (Ports & Adapters)** pattern, e
 
 ---
 
+## Performance & Observability
+
+The service includes basic performance optimizations and observability features to ensure efficient execution and operational visibility.
+
+### Caching (Caffeine)
+
+To improve performance and reduce database load, the applicable price lookup is cached using **Caffeine**.
+
+- Cache name: `applicable-price`
+- Key strategy: `applicationDate|productId|brandId`
+- Eviction policy:
+    - Maximum size: 1,000 entries
+    - Expiration: 1 minute after write
+
+The cache is applied at the persistence adapter level using `@Cacheable`, ensuring that repeated queries with identical parameters do not hit the database.
+
+### Query Optimization
+
+The price lookup query is implemented using a **native SQL query**, replacing derived query methods to:
+
+- provide full control over execution
+- optimize filtering and ordering
+- align with index strategy
+- improve performance predictability
+
+### Observability (Micrometer + Actuator)
+
+Basic telemetry is implemented using **Micrometer** and exposed via **Spring Boot Actuator**.
+
+Metrics are collected at the use case level (`ApplicablePriceService`) to capture real business execution behavior.
+
+#### Available metrics
+
+| Metric | Description |
+|---|---|
+| `pricing.applicable_price.requests` | Total number of requests |
+| `pricing.applicable_price.found` | Requests that returned a price |
+| `pricing.applicable_price.not_found` | Requests with no applicable price |
+| `pricing.applicable_price.validation_error` | Requests rejected due to invalid input |
+| `pricing.applicable_price.execution` | Execution time of the use case |
+
+#### Actuator endpoints
+
+- `/actuator/health`
+- `/actuator/metrics`
+- `/actuator/metrics/pricing.applicable_price.execution`
+- `/actuator/caches`
+
+Example:
+
+```bash
+curl http://localhost:8080/actuator/metrics/pricing.applicable_price.execution
+---
+
 ## Data Model
 
 The relational model is structured for referential integrity, auditability, and query efficiency.
@@ -312,6 +366,7 @@ The test suite is structured in five independent layers, each with a different s
 
 **JPA repository tests** (`PriceJpaRepositoryTest`) run against a real H2 instance with `@DataJpaTest`. They cover the five mandatory scenarios from the challenge specification, plus boundary conditions (inclusive start/end dates, inactive price exclusion via `@Sql`, fallback to base price after a promotional window closes, and empty results for unknown combinations).
 
+**Telemetry tests** validate the correct emission of metrics at the service layer using `SimpleMeterRegistry`, ensuring accurate tracking of request volume, outcomes, and execution time without coupling to infrastructure.
 ---
 
 ## Tech Stack
@@ -327,7 +382,8 @@ The test suite is structured in five independent layers, each with a different s
 | Testing | JUnit 5 · Mockito · MockMvc · `@DataJpaTest` |
 | Coverage | JaCoCo 0.8.11 |
 | Build | Maven 3 |
-
+| Observability | Micrometer + Spring Boot Actuator |
+| Caching | Caffeine |
 ---
 
 ## Project Structure
@@ -370,6 +426,9 @@ src/
 │   │                   ├── CurrencyEntity.java
 │   │                   ├── PriceEntity.java
 │   │                   └── ProductEntity.java
+│   │       ├── config/
+│   │       │   ├── CacheConfig.java
+│   │       │   └── CacheKeyFactory.java
 │   └── resources/
 │       ├── application.yaml
 │       ├── data.sql
@@ -393,4 +452,5 @@ src/
                     ├── CurrencyEntityTest.java
                     ├── PriceEntityTest.java
                     └── ProductEntityTest.java
+           
 ```

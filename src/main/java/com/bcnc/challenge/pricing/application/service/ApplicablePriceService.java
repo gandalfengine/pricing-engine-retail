@@ -5,6 +5,9 @@ import com.bcnc.challenge.pricing.application.ports.in.GetApplicablePriceUseCase
 import com.bcnc.challenge.pricing.application.ports.out.LoadApplicablePricePort;
 import com.bcnc.challenge.pricing.domain.model.Price;
 import com.bcnc.challenge.pricing.application.result.ApplicablePriceResult;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -15,9 +18,30 @@ import java.time.LocalDateTime;
 public class ApplicablePriceService implements GetApplicablePriceUseCase {
 
     private final LoadApplicablePricePort loadApplicablePricePort;
+    private final Timer applicablePriceExecutionTimer;
+    private final Counter applicablePriceRequestCounter;
+    private final Counter applicablePriceFoundCounter;
+    private final Counter applicablePriceNotFoundCounter;
+    private final Counter applicablePriceValidationErrorCounter;
 
-    public ApplicablePriceService(LoadApplicablePricePort loadApplicablePricePort) {
+    public ApplicablePriceService(LoadApplicablePricePort loadApplicablePricePort,
+                                  MeterRegistry meterRegistry) {
         this.loadApplicablePricePort = loadApplicablePricePort;
+        this.applicablePriceExecutionTimer = Timer.builder("pricing.applicable_price.execution")
+                .description("Time taken to resolve applicable price")
+                .register(meterRegistry);
+        this.applicablePriceRequestCounter = Counter.builder("pricing.applicable_price.requests")
+                .description("Total applicable price requests")
+                .register(meterRegistry);
+        this.applicablePriceFoundCounter = Counter.builder("pricing.applicable_price.found")
+                .description("Total applicable price requests with result")
+                .register(meterRegistry);
+        this.applicablePriceNotFoundCounter = Counter.builder("pricing.applicable_price.not_found")
+                .description("Total applicable price requests without result")
+                .register(meterRegistry);
+        this.applicablePriceValidationErrorCounter = Counter.builder("pricing.applicable_price.validation_error")
+                .description("Total applicable price requests rejected by input validation")
+                .register(meterRegistry);
     }
 
     @Override
@@ -26,22 +50,34 @@ public class ApplicablePriceService implements GetApplicablePriceUseCase {
             Long productId,
             Long brandId
     ) {
-        validateInput(applicationDate, productId, brandId);
+        applicablePriceRequestCounter.increment();
+        Timer.Sample executionTimerSample = Timer.start();
 
-        log.info("Searching applicable price. applicationDate={}, productId={}, brandId={}",
-                applicationDate, productId, brandId);
+        try {
+            validateInput(applicationDate, productId, brandId);
 
-        Price price = loadApplicablePricePort
-                .loadApplicablePrice(applicationDate, productId, brandId)
-                .orElseThrow(() -> notFound(applicationDate, productId, brandId));
+            log.info("Searching applicable price. applicationDate={}, productId={}, brandId={}",
+                    applicationDate, productId, brandId);
 
-        log.info("Applicable price found. price={}", price);
+            Price price = loadApplicablePricePort
+                    .loadApplicablePrice(applicationDate, productId, brandId)
+                    .orElseThrow(() -> notFound(applicationDate, productId, brandId));
 
-        return toResponse(price);
+            log.info("Applicable price found. price={}", price);
+
+            return toResponse(price);
+        } catch (IllegalArgumentException ex) {
+            applicablePriceValidationErrorCounter.increment();
+            throw ex;
+        } finally {
+            executionTimerSample.stop(applicablePriceExecutionTimer);
+        }
     }
 
     private ApplicablePriceNotFoundException notFound(
             LocalDateTime applicationDate, Long productId, Long brandId) {
+
+        applicablePriceNotFoundCounter.increment();
 
         log.warn("No applicable price found. applicationDate={}, productId={}, brandId={}",
                 applicationDate, productId, brandId);
