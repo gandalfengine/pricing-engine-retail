@@ -46,6 +46,7 @@ class ApplicablePriceServiceTelemetryTest {
         service.execute(applicationDate, 35455L, 1L);
 
         assertEquals(1.0, meterRegistry.get("pricing.applicable_price.requests").counter().count());
+        assertEquals(1.0, meterRegistry.get("pricing.applicable_price.found").counter().count());
         assertEquals(0.0, meterRegistry.get("pricing.applicable_price.not_found").counter().count());
         assertEquals(0.0, meterRegistry.get("pricing.applicable_price.validation_error").counter().count());
 
