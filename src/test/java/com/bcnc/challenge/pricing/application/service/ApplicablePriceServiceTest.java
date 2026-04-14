@@ -27,14 +27,24 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
+
 @ExtendWith(MockitoExtension.class)
 class ApplicablePriceServiceTest {
 
     @Mock
     private LoadApplicablePricePort loadApplicablePricePort;
 
-    @InjectMocks
     private ApplicablePriceService applicablePriceService;
+
+    @BeforeEach
+    void setUp() {
+        applicablePriceService = new ApplicablePriceService(
+                loadApplicablePricePort,
+                new SimpleMeterRegistry()
+        );
+    }
 
     @Test
     void shouldReturnApplicablePriceResponseWhenApplicablePriceExists() {
