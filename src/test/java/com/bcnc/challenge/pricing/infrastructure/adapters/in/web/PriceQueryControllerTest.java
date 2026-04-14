@@ -2,9 +2,9 @@ package com.bcnc.challenge.pricing.infrastructure.adapters.in.web;
 
 import com.bcnc.challenge.pricing.application.exceptions.ApplicablePriceNotFoundException;
 import com.bcnc.challenge.pricing.application.ports.in.GetApplicablePriceUseCase;
+import com.bcnc.challenge.pricing.application.result.ApplicablePriceResult;
 import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.filter.CorrelationIdFilter;
 import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.handler.GlobalExceptionHandler;
-import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.response.ApplicablePriceResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,7 +54,7 @@ class PriceQueryControllerTest {
 
     @Test
     void shouldReturnApplicablePriceWhenRequestIsValid(CapturedOutput output) throws Exception {
-        var response = new ApplicablePriceResponse(
+        var response = new ApplicablePriceResult(
                 35455L,
                 1L,
                 1,
@@ -328,7 +328,7 @@ class PriceQueryControllerTest {
     @Test
     void shouldReturnProvidedCorrelationIdInResponseHeader() throws Exception {
         when(getApplicablePriceUseCase.execute(any(), anyLong(), anyLong()))
-                .thenReturn(new ApplicablePriceResponse(
+                .thenReturn(new ApplicablePriceResult(
                         35455L,
                         1L,
                         1,

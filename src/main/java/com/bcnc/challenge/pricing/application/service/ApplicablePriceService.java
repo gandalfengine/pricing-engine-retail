@@ -4,7 +4,7 @@ import com.bcnc.challenge.pricing.application.exceptions.ApplicablePriceNotFound
 import com.bcnc.challenge.pricing.application.ports.in.GetApplicablePriceUseCase;
 import com.bcnc.challenge.pricing.application.ports.out.LoadApplicablePricePort;
 import com.bcnc.challenge.pricing.domain.model.Price;
-import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.response.ApplicablePriceResponse;
+import com.bcnc.challenge.pricing.application.result.ApplicablePriceResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +21,7 @@ public class ApplicablePriceService implements GetApplicablePriceUseCase {
     }
 
     @Override
-    public ApplicablePriceResponse execute(
+    public ApplicablePriceResult execute(
             LocalDateTime applicationDate,
             Long productId,
             Long brandId
@@ -51,8 +51,8 @@ public class ApplicablePriceService implements GetApplicablePriceUseCase {
                         .formatted(productId, brandId, applicationDate));
     }
 
-    private static ApplicablePriceResponse toResponse(Price price) {
-        return new ApplicablePriceResponse(
+    private static ApplicablePriceResult toResponse(Price price) {
+        return new ApplicablePriceResult(
                 price.product().id(),
                 price.brand().id(),
                 price.priceList(),
