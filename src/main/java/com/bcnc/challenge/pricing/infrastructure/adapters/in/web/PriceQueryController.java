@@ -1,6 +1,7 @@
 package com.bcnc.challenge.pricing.infrastructure.adapters.in.web;
 
 import com.bcnc.challenge.pricing.application.ports.in.GetApplicablePriceUseCase;
+import com.bcnc.challenge.pricing.application.result.ApplicablePriceResult;
 import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.response.ApiResponse;
 import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.response.ApplicablePriceResponse;
 import jakarta.validation.constraints.NotNull;
@@ -39,23 +40,26 @@ public class PriceQueryController {
     ) {
         log.info("Price query received. criteria={}", criteria);
 
-        var response = getApplicablePriceUseCase.execute(
+        var result = getApplicablePriceUseCase.execute(
                 criteria.applicationDate(),
                 criteria.productId(),
                 criteria.brandId()
         );
 
-        log.info(
-                "Price query processed successfully. productId={}, brandId={}, priceList={}",
-                response.productId(),
-                response.brandId(),
-                response.priceList()
-        );
+        log.info("Price query processed successfully. productId={}, brandId={}, priceList={}",
+                result.productId(), result.brandId(), result.priceList());
 
-        return ApiResponse.success(
-                SUCCESS_MESSAGE,
-                correlationId,
-                response
+        return ApiResponse.success(SUCCESS_MESSAGE, correlationId, toResponse(result));
+    }
+
+    private static ApplicablePriceResponse toResponse(ApplicablePriceResult result) {
+        return new ApplicablePriceResponse(
+                result.productId(),
+                result.brandId(),
+                result.priceList(),
+                result.startDate(),
+                result.endDate(),
+                result.price()
         );
     }
 

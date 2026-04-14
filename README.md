@@ -32,8 +32,18 @@ payload de sucesso
 }
 }
 
-payload de erro 
-
+payload de erro
+{
+"message": "Invalid request",
+"correlationId": "86d7a2fd-9581-4686-ba9b-59ebb8d7183a",
+"error": {
+"type": "about:blank",
+"title": "Invalid request",
+"status": 400,
+"detail": "Invalid value for parameter: productId",
+"instance": "/api/v1/prices"
+}
+}
 
 coias legais.
 a aplicacao possui o correlationId configurado para fazer o tracking da requisicao

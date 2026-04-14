@@ -1,9 +1,9 @@
 package com.bcnc.challenge.pricing.application.ports.in;
 
-import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.response.ApplicablePriceResponse;
+import com.bcnc.challenge.pricing.application.result.ApplicablePriceResult;
 
 import java.time.LocalDateTime;
 
 public interface GetApplicablePriceUseCase {
-    ApplicablePriceResponse execute(LocalDateTime applicationDate, Long productId, Long brandId);
+    ApplicablePriceResult execute(LocalDateTime applicationDate, Long productId, Long brandId);
 }

@@ -2,6 +2,7 @@ package com.bcnc.challenge.pricing.application.service;
 
 import com.bcnc.challenge.pricing.application.exceptions.ApplicablePriceNotFoundException;
 import com.bcnc.challenge.pricing.application.ports.out.LoadApplicablePricePort;
+import com.bcnc.challenge.pricing.application.result.ApplicablePriceResult;
 import com.bcnc.challenge.pricing.domain.model.AuditMetadata;
 import com.bcnc.challenge.pricing.domain.model.Brand;
 import com.bcnc.challenge.pricing.domain.model.Currency;
@@ -63,7 +64,7 @@ class ApplicablePriceServiceTest {
         when(loadApplicablePricePort.loadApplicablePrice(applicationDate, productId, brandId))
                 .thenReturn(Optional.of(price));
 
-        ApplicablePriceResponse response = applicablePriceService.execute(applicationDate, productId, brandId);
+        ApplicablePriceResult response = applicablePriceService.execute(applicationDate, productId, brandId);
 
         assertNotNull(response);
         assertEquals(productId, response.productId());
@@ -142,7 +143,7 @@ class ApplicablePriceServiceTest {
         when(loadApplicablePricePort.loadApplicablePrice(applicationDate, productId, brandId))
                 .thenReturn(Optional.of(price));
 
-        ApplicablePriceResponse response = applicablePriceService.execute(applicationDate, productId, brandId);
+        ApplicablePriceResult response = applicablePriceService.execute(applicationDate, productId, brandId);
 
         assertEquals(35458L, response.productId());
         assertEquals(4L, response.brandId());
@@ -216,7 +217,7 @@ class ApplicablePriceServiceTest {
         when(loadApplicablePricePort.loadApplicablePrice(applicationDate, productId, brandId))
                 .thenReturn(Optional.of(price));
 
-        ApplicablePriceResponse response = applicablePriceService.execute(applicationDate, productId, brandId);
+        ApplicablePriceResult response = applicablePriceService.execute(applicationDate, productId, brandId);
 
         assertEquals(new BigDecimal("37.9900"), response.price());
     }
@@ -248,7 +249,7 @@ class ApplicablePriceServiceTest {
         when(loadApplicablePricePort.loadApplicablePrice(applicationDate, productId, brandId))
                 .thenReturn(Optional.of(price));
 
-        ApplicablePriceResponse response = applicablePriceService.execute(applicationDate, productId, brandId);
+        ApplicablePriceResult response = applicablePriceService.execute(applicationDate, productId, brandId);
 
         assertEquals(LocalDateTime.of(2020, 6, 15, 8, 0), response.startDate());
         assertEquals(LocalDateTime.of(2020, 6, 15, 22, 0), response.endDate());
@@ -282,7 +283,7 @@ class ApplicablePriceServiceTest {
         when(loadApplicablePricePort.loadApplicablePrice(applicationDate, productId, brandId))
                 .thenReturn(Optional.of(price));
 
-        ApplicablePriceResponse response = applicablePriceService.execute(applicationDate, productId, brandId);
+        ApplicablePriceResult response = applicablePriceService.execute(applicationDate, productId, brandId);
 
         assertNotNull(response);
         assertEquals(productId, response.productId());
