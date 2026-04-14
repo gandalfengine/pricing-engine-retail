@@ -7,7 +7,6 @@ import com.bcnc.challenge.pricing.infrastructure.adapters.out.persistence.entity
 import com.bcnc.challenge.pricing.infrastructure.adapters.out.persistence.entity.ProductEntity;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -52,8 +51,8 @@ class PricePersistenceAdapterTest {
                 LocalDateTime.of(2020, 6, 14, 15, 0)
         );
 
-        when(priceJpaRepository.findTopByProduct_IdAndBrand_IdAndStartDateLessThanEqualAndEndDateGreaterThanEqualAndActiveTrueOrderByPriorityDesc(
-                productId, brandId, applicationDate, applicationDate
+        when(priceJpaRepository.findApplicablePrice(
+                productId, brandId, applicationDate
         )).thenReturn(Optional.of(entity));
 
         Optional<Price> result = pricePersistenceAdapter.loadApplicablePrice(applicationDate, productId, brandId);
@@ -84,8 +83,8 @@ class PricePersistenceAdapterTest {
         Long productId = 99999L;
         Long brandId = 99L;
 
-        when(priceJpaRepository.findTopByProduct_IdAndBrand_IdAndStartDateLessThanEqualAndEndDateGreaterThanEqualAndActiveTrueOrderByPriorityDesc(
-                productId, brandId, applicationDate, applicationDate
+        when(priceJpaRepository.findApplicablePrice(
+                productId, brandId, applicationDate
         )).thenReturn(Optional.empty());
 
         Optional<Price> result = pricePersistenceAdapter.loadApplicablePrice(applicationDate, productId, brandId);
@@ -94,34 +93,18 @@ class PricePersistenceAdapterTest {
     }
 
     @Test
-    void shouldCallRepositoryWithSameApplicationDateTwice() {
+    void shouldCallRepositoryWithExpectedParameters() {
         LocalDateTime applicationDate = LocalDateTime.of(2020, 6, 15, 10, 0);
         Long productId = 35455L;
         Long brandId = 1L;
 
-        when(priceJpaRepository.findTopByProduct_IdAndBrand_IdAndStartDateLessThanEqualAndEndDateGreaterThanEqualAndActiveTrueOrderByPriorityDesc(
-                anyLong(), anyLong(), any(LocalDateTime.class), any(LocalDateTime.class)
-        )).thenReturn(Optional.empty());
+        when(priceJpaRepository.findApplicablePrice(productId, brandId, applicationDate))
+                .thenReturn(Optional.empty());
 
         pricePersistenceAdapter.loadApplicablePrice(applicationDate, productId, brandId);
 
-        ArgumentCaptor<Long> productIdCaptor = ArgumentCaptor.forClass(Long.class);
-        ArgumentCaptor<Long> brandIdCaptor = ArgumentCaptor.forClass(Long.class);
-        ArgumentCaptor<LocalDateTime> firstDateCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
-        ArgumentCaptor<LocalDateTime> secondDateCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
-
         verify(priceJpaRepository, times(1))
-                .findTopByProduct_IdAndBrand_IdAndStartDateLessThanEqualAndEndDateGreaterThanEqualAndActiveTrueOrderByPriorityDesc(
-                        productIdCaptor.capture(),
-                        brandIdCaptor.capture(),
-                        firstDateCaptor.capture(),
-                        secondDateCaptor.capture()
-                );
-
-        assertEquals(productId, productIdCaptor.getValue());
-        assertEquals(brandId, brandIdCaptor.getValue());
-        assertEquals(applicationDate, firstDateCaptor.getValue());
-        assertEquals(applicationDate, secondDateCaptor.getValue());
+                .findApplicablePrice(productId, brandId, applicationDate);
     }
 
     @Test
@@ -148,8 +131,8 @@ class PricePersistenceAdapterTest {
                 LocalDateTime.of(2020, 6, 16, 12, 30)
         );
 
-        when(priceJpaRepository.findTopByProduct_IdAndBrand_IdAndStartDateLessThanEqualAndEndDateGreaterThanEqualAndActiveTrueOrderByPriorityDesc(
-                productId, brandId, applicationDate, applicationDate
+        when(priceJpaRepository.findApplicablePrice(
+                productId, brandId, applicationDate
         )).thenReturn(Optional.of(entity));
 
         Optional<Price> result = pricePersistenceAdapter.loadApplicablePrice(applicationDate, productId, brandId);
@@ -184,8 +167,8 @@ class PricePersistenceAdapterTest {
                 LocalDateTime.of(2020, 6, 14, 10, 0)
         );
 
-        when(priceJpaRepository.findTopByProduct_IdAndBrand_IdAndStartDateLessThanEqualAndEndDateGreaterThanEqualAndActiveTrueOrderByPriorityDesc(
-                productId, brandId, applicationDate, applicationDate
+        when(priceJpaRepository.findApplicablePrice(
+                productId, brandId, applicationDate
         )).thenReturn(Optional.of(entity));
 
         Optional<Price> result = pricePersistenceAdapter.loadApplicablePrice(applicationDate, productId, brandId);

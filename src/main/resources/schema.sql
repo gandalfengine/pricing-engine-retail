@@ -51,11 +51,5 @@ CREATE TABLE prices (
                             FOREIGN KEY (currency_code) REFERENCES currencies(iso_code)
 );
 
-CREATE INDEX idx_prices_brand_product_dates
-    ON prices (brand_id, product_id, start_date, end_date);
-
-CREATE INDEX idx_prices_priority
-    ON prices (priority);
-
-CREATE INDEX idx_prices_active
-    ON prices (active);
+CREATE INDEX idx_prices_search
+    ON prices (brand_id, product_id, active, start_date, end_date, priority);
