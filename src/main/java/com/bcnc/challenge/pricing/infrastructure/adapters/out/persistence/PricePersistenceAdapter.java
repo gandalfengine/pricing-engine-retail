@@ -7,17 +7,15 @@ import com.bcnc.challenge.pricing.domain.model.Currency;
 import com.bcnc.challenge.pricing.domain.model.Price;
 import com.bcnc.challenge.pricing.domain.model.Product;
 import com.bcnc.challenge.pricing.infrastructure.adapters.out.persistence.entity.PriceEntity;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
 
+@Slf4j
 @Component
 public class PricePersistenceAdapter implements LoadApplicablePricePort {
-
-    private static final Logger log = LoggerFactory.getLogger(PricePersistenceAdapter.class);
 
     private final PriceJpaRepository priceJpaRepository;
 
@@ -38,7 +36,7 @@ public class PricePersistenceAdapter implements LoadApplicablePricePort {
                 brandId
         );
 
-        Optional<Price> result = priceJpaRepository
+        return priceJpaRepository
                 .findTopByProduct_IdAndBrand_IdAndStartDateLessThanEqualAndEndDateGreaterThanEqualAndActiveTrueOrderByPriorityDesc(
                         productId,
                         brandId,
@@ -46,13 +44,6 @@ public class PricePersistenceAdapter implements LoadApplicablePricePort {
                         applicationDate
                 )
                 .map(this::toDomain);
-
-        log.info(
-                "Persistence lookup finished. found={}",
-                result.isPresent()
-        );
-
-        return result;
     }
 
     private Price toDomain(PriceEntity entity) {

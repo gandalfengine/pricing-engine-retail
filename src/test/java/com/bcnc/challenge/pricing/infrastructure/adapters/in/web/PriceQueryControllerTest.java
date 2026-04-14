@@ -5,6 +5,7 @@ import com.bcnc.challenge.pricing.application.ports.in.GetApplicablePriceUseCase
 import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.filter.CorrelationIdFilter;
 import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.handler.GlobalExceptionHandler;
 import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.response.ApplicablePriceResponse;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -325,7 +326,8 @@ class PriceQueryControllerTest {
         assertUnexpectedErrorLog(output, correlationId);
     }
 
-   /* @Test
+    @Disabled
+    @Test
     void shouldGenerateCorrelationIdWhenHeaderIsNotProvided() throws Exception {
         when(getApplicablePriceUseCase.execute(any(), anyLong(), anyLong()))
                 .thenReturn(new ApplicablePriceResponse(
@@ -345,6 +347,7 @@ class PriceQueryControllerTest {
                 .andExpect(header().exists("X-Correlation-Id"));
     }
 
+    @Disabled
     @Test
     void shouldReturnProvidedCorrelationIdInResponseHeader() throws Exception {
         when(getApplicablePriceUseCase.execute(any(), anyLong(), anyLong()))
@@ -365,7 +368,7 @@ class PriceQueryControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("X-Correlation-Id", "test-correlation-id-123"));
     }
-*/
+
     private ResultActions assertBadRequest(ResultActions result, String detail) throws Exception {
         return result
                 .andExpect(status().isBadRequest())

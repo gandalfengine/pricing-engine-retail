@@ -18,6 +18,28 @@ Quando houver mais de um preço válido para o mesmo período:
 
 ---
 
+payload de sucesso
+{
+"message": "Applicable price retrieved successfully",
+"correlationId": "86d7a2fd-9581-4686-ba9b-59ebb8d7183a",
+"payload": {
+"productId": 35455,
+"brandId": 1,
+"priceList": 1,
+"startDate": "2020-06-14T00:00:00",
+"endDate": "2020-12-31T23:59:59",
+"price": 35.50
+}
+}
+
+payload de erro 
+
+
+coias legais.
+a aplicacao possui o correlationId configurado para fazer o tracking da requisicao
+o correlationID pode ser passado no header ou em caso nao exista eh criad um.
+
+
 ## 🏗️ Arquitetura
 
 O projeto segue o padrão **Hexagonal Architecture (Ports & Adapters)**:
