@@ -5,6 +5,7 @@ import com.bcnc.challenge.pricing.application.ports.in.GetApplicablePriceUseCase
 import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.filter.CorrelationIdFilter;
 import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.handler.GlobalExceptionHandler;
 import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.response.ApplicablePriceResponse;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,8 @@ import java.time.LocalDateTime;
 
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -321,6 +324,49 @@ class PriceQueryControllerTest {
 
         String correlationId = mvcResult.getResponse().getHeader(CorrelationIdFilter.CORRELATION_ID_HEADER);
         assertUnexpectedErrorLog(output, correlationId);
+    }
+
+    @Disabled
+    @Test
+    void shouldGenerateCorrelationIdWhenHeaderIsNotProvided() throws Exception {
+        when(getApplicablePriceUseCase.execute(any(), anyLong(), anyLong()))
+                .thenReturn(new ApplicablePriceResponse(
+                        35455L,
+                        1L,
+                        1,
+                        LocalDateTime.of(2020, 6, 14, 0, 0),
+                        LocalDateTime.of(2020, 12, 31, 23, 59, 59),
+                        new BigDecimal("35.50")
+                ));
+
+        mockMvc.perform(get("/api/prices")
+                        .param("applicationDate", "2020-06-14T10:00:00")
+                        .param("productId", "35455")
+                        .param("brandId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(header().exists("X-Correlation-Id"));
+    }
+
+    @Disabled
+    @Test
+    void shouldReturnProvidedCorrelationIdInResponseHeader() throws Exception {
+        when(getApplicablePriceUseCase.execute(any(), anyLong(), anyLong()))
+                .thenReturn(new ApplicablePriceResponse(
+                        35455L,
+                        1L,
+                        1,
+                        LocalDateTime.of(2020, 6, 14, 0, 0),
+                        LocalDateTime.of(2020, 12, 31, 23, 59, 59),
+                        new BigDecimal("35.50")
+                ));
+
+        mockMvc.perform(get("/api/prices")
+                        .param("applicationDate", "2020-06-14T10:00:00")
+                        .param("productId", "35455")
+                        .param("brandId", "1")
+                        .header("X-Correlation-Id", "test-correlation-id-123"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("X-Correlation-Id", "test-correlation-id-123"));
     }
 
     private ResultActions assertBadRequest(ResultActions result, String detail) throws Exception {
