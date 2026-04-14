@@ -8,7 +8,6 @@ import com.bcnc.challenge.pricing.domain.model.Brand;
 import com.bcnc.challenge.pricing.domain.model.Currency;
 import com.bcnc.challenge.pricing.domain.model.Price;
 import com.bcnc.challenge.pricing.domain.model.Product;
-import com.bcnc.challenge.pricing.infrastructure.adapters.in.web.response.ApplicablePriceResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
