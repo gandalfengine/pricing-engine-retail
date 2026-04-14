@@ -65,6 +65,7 @@ public class ApplicablePriceService implements GetApplicablePriceUseCase {
 
             log.info("Applicable price found. price={}", price);
 
+            applicablePriceFoundCounter.increment();
             return toResponse(price);
         } catch (IllegalArgumentException ex) {
             applicablePriceValidationErrorCounter.increment();

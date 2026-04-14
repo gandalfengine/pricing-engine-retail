@@ -1,6 +1,6 @@
 # pricing-engine-retail
 
-Backend service built with **Java 21** and **Spring Boot 3.3.5**, designed to resolve applicable retail prices based on date, product, and brand — following **Hexagonal Architecture**, **Domain-Driven Design**, and modern engineering best practices.
+Backend service built with **Java 21** and **Spring Boot 3.3.5**, designed to resolve the applicable retail price for a given date, product, and brand — following **Hexagonal Architecture** and **Domain-Driven Design**.
 
 ---
 
@@ -10,6 +10,7 @@ Backend service built with **Java 21** and **Spring Boot 3.3.5**, designed to re
 - [Architecture](#architecture)
 - [Data Model](#data-model)
 - [API Reference](#api-reference)
+- [Performance & Observability](#performance--observability)
 - [Getting Started](#getting-started)
 - [Running Tests](#running-tests)
 - [Test Coverage](#test-coverage)
@@ -20,7 +21,7 @@ Backend service built with **Java 21** and **Spring Boot 3.3.5**, designed to re
 
 ## Overview
 
-Given a date, a product ID, and a brand ID, the service returns the single applicable price — resolving conflicts by selecting the entry with the highest priority when multiple price windows overlap.
+Given an application date, a product ID, and a brand ID, the service returns the single applicable price — resolving conflicts by selecting the entry with the highest `priority` when multiple price windows overlap.
 
 **Core business rule:**
 
@@ -44,10 +45,10 @@ The project follows the **Hexagonal Architecture (Ports & Adapters)** pattern, e
 │   ┌──────▼──────────────────────────────────────▼───────┐  │
 │   │                    application                      │  │
 │   │                                                     │  │
-│   │   Port IN: GetApplicablePriceUseCase                │  │
+│   │   Port IN:  GetApplicablePriceUseCase               │  │
 │   │   Port OUT: LoadApplicablePricePort                 │  │
-│   │   Service: ApplicablePriceService                   │  │
-│   │   Result: ApplicablePriceResult                     │  │
+│   │   Service:  ApplicablePriceService                  │  │
+│   │   Result:   ApplicablePriceResult                   │  │
 │   │                                                     │  │
 │   │   ┌──────────────────────────────────────────────┐  │  │
 │   │   │                   domain                     │  │  │
@@ -60,7 +61,7 @@ The project follows the **Hexagonal Architecture (Ports & Adapters)** pattern, e
 
 **Dependency direction:** every layer depends only on layers interior to it. The domain knows nothing about the application or infrastructure. The application knows nothing about HTTP or JPA.
 
-### Package structure and responsibilities
+### Package responsibilities
 
 | Package | Responsibility |
 |---|---|
@@ -68,69 +69,16 @@ The project follows the **Hexagonal Architecture (Ports & Adapters)** pattern, e
 | `application.ports.in` | Inbound port — defines the use case contract (`GetApplicablePriceUseCase`) |
 | `application.ports.out` | Outbound port — defines the persistence contract (`LoadApplicablePricePort`) |
 | `application.result` | Use case output type (`ApplicablePriceResult`) — belongs to the application layer, not to infrastructure |
-| `application.service` | Use case implementation — orchestrates domain logic, delegates persistence via port |
+| `application.service` | Use case implementation — orchestrates domain logic and delegates persistence via port |
 | `application.exceptions` | Domain-level exceptions (`ApplicablePriceNotFoundException`) |
-| `infrastructure.adapters.in.web` | REST controller, request criteria record, response mapping |
-| `infrastructure.adapters.in.web.filter` | `CorrelationIdFilter` — injects/propagates `X-Correlation-Id` via MDC |
+| `infrastructure.adapters.in.web` | REST controller, request criteria record, and response mapping |
+| `infrastructure.adapters.in.web.filter` | `CorrelationIdFilter` — injects and propagates `X-Correlation-Id` via MDC |
 | `infrastructure.adapters.in.web.handler` | `GlobalExceptionHandler` — maps exceptions to structured HTTP responses |
 | `infrastructure.adapters.in.web.response` | HTTP response types (`ApiResponse`, `ApplicablePriceResponse`, `ApiErrorResponse`) |
-| `infrastructure.adapters.out.persistence` | JPA repository, persistence adapter, entity-to-domain mapping |
+| `infrastructure.adapters.out.persistence` | JPA repository, persistence adapter, and entity-to-domain mapping |
 | `infrastructure.adapters.out.persistence.entity` | JPA entities with `AuditableEntity` lifecycle hooks |
+| `infrastructure.config` | Caffeine cache configuration and cache key factory |
 
----
-
-## Performance & Observability
-
-The service includes basic performance optimizations and observability features to ensure efficient execution and operational visibility.
-
-### Caching (Caffeine)
-
-To improve performance and reduce database load, the applicable price lookup is cached using **Caffeine**.
-
-- Cache name: `applicable-price`
-- Key strategy: `applicationDate|productId|brandId`
-- Eviction policy:
-    - Maximum size: 1,000 entries
-    - Expiration: 1 minute after write
-
-The cache is applied at the persistence adapter level using `@Cacheable`, ensuring that repeated queries with identical parameters do not hit the database.
-
-### Query Optimization
-
-The price lookup query is implemented using a **native SQL query**, replacing derived query methods to:
-
-- provide full control over execution
-- optimize filtering and ordering
-- align with index strategy
-- improve performance predictability
-
-### Observability (Micrometer + Actuator)
-
-Basic telemetry is implemented using **Micrometer** and exposed via **Spring Boot Actuator**.
-
-Metrics are collected at the use case level (`ApplicablePriceService`) to capture real business execution behavior.
-
-#### Available metrics
-
-| Metric | Description |
-|---|---|
-| `pricing.applicable_price.requests` | Total number of requests |
-| `pricing.applicable_price.found` | Requests that returned a price |
-| `pricing.applicable_price.not_found` | Requests with no applicable price |
-| `pricing.applicable_price.validation_error` | Requests rejected due to invalid input |
-| `pricing.applicable_price.execution` | Execution time of the use case |
-
-#### Actuator endpoints
-
-- `/actuator/health`
-- `/actuator/metrics`
-- `/actuator/metrics/pricing.applicable_price.execution`
-- `/actuator/caches`
-
-Example:
-
-```bash
-curl http://localhost:8080/actuator/metrics/pricing.applicable_price.execution
 ---
 
 ## Data Model
@@ -183,13 +131,11 @@ erDiagram
     CURRENCIES ||--o{ PRICES : uses
 ```
 
-**Index strategy:** three indexes are created at startup to support the primary query pattern:
+**Index strategy:** a composite index is created at startup to support the primary query pattern:
 
-- `idx_prices_brand_product_dates` on `(brand_id, product_id, start_date, end_date)` — covers the main filter
-- `idx_prices_priority` on `(priority)` — supports `ORDER BY priority DESC`
-- `idx_prices_active` on `(active)` — supports the active flag filter
+- `idx_prices_search` on `(brand_id, product_id, active, start_date, end_date, priority)` — covers filtering, active flag, date range, and priority ordering in a single index scan.
 
-The database is an **H2 in-memory instance** initialised at startup from `schema.sql` and `data.sql`.
+The database is an **H2 in-memory instance** initialised at startup from `schema.sql` and `data.sql`. Seed data includes 4 brands (ZARA, PULL\_AND\_BEAR, MASSIMO\_DUTTI, BERSHKA), 4 products, 4 currencies, and 23 price records across multiple overlapping windows.
 
 ---
 
@@ -271,20 +217,22 @@ curl -H "X-Correlation-Id: my-trace-id-123" \
 
 #### Example requests
 
+The five mandatory test scenarios from the challenge specification:
+
 ```bash
-# Test 1 — 2020-06-14 at 10:00 → price list 1 (35.50 EUR)
+# Test 1 — 2020-06-14 at 10:00 → price list 1 (35.50 EUR) — base price, no overlap
 curl "http://localhost:8080/api/v1/prices?applicationDate=2020-06-14T10:00:00&productId=35455&brandId=1"
 
-# Test 2 — 2020-06-14 at 16:00 → price list 2 (25.45 EUR, higher priority)
+# Test 2 — 2020-06-14 at 16:00 → price list 2 (25.45 EUR) — promotional window, higher priority wins
 curl "http://localhost:8080/api/v1/prices?applicationDate=2020-06-14T16:00:00&productId=35455&brandId=1"
 
-# Test 3 — 2020-06-14 at 21:00 → price list 1 (35.50 EUR, promotional window closed)
+# Test 3 — 2020-06-14 at 21:00 → price list 1 (35.50 EUR) — promotional window closed, base price resumes
 curl "http://localhost:8080/api/v1/prices?applicationDate=2020-06-14T21:00:00&productId=35455&brandId=1"
 
-# Test 4 — 2020-06-15 at 10:00 → price list 3 (30.50 EUR)
+# Test 4 — 2020-06-15 at 10:00 → price list 3 (30.50 EUR) — new promotional window
 curl "http://localhost:8080/api/v1/prices?applicationDate=2020-06-15T10:00:00&productId=35455&brandId=1"
 
-# Test 5 — 2020-06-16 at 21:00 → price list 4 (38.95 EUR)
+# Test 5 — 2020-06-16 at 21:00 → price list 4 (38.95 EUR) — long-running promotion active
 curl "http://localhost:8080/api/v1/prices?applicationDate=2020-06-16T21:00:00&productId=35455&brandId=1"
 ```
 
@@ -296,7 +244,67 @@ Available at `http://localhost:8080/h2-console` while the application is running
 |---|---|
 | JDBC URL | `jdbc:h2:mem:pricingdb` |
 | Username | `sa` |
-| Password | _(empty)_ |
+| Password | *(empty)* |
+
+---
+
+## Performance & Observability
+
+### Caching (Caffeine)
+
+Applicable price lookups are cached at the persistence adapter level using **Caffeine** and Spring's `@Cacheable`.
+
+| Setting | Value |
+|---|---|
+| Cache name | `applicable-price` |
+| Key | `applicationDate\|productId\|brandId` |
+| Max size | 1,000 entries |
+| Expiration | 1 minute after write |
+
+Cache behaviour is verified by an integration test (`PricePersistenceAdapterCacheIT`) that asserts the JPA repository is called only once for repeated identical requests.
+
+### Query Optimisation
+
+The price lookup uses a **native SQL query** rather than a derived JPQL method. This gives full control over filtering, ordering, and index alignment, and makes the execution plan predictable regardless of JPA provider version.
+
+```sql
+SELECT p.*
+FROM prices p
+WHERE p.product_id = :productId
+  AND p.brand_id   = :brandId
+  AND p.active     = true
+  AND p.start_date <= :applicationDate
+  AND p.end_date   >= :applicationDate
+ORDER BY p.priority DESC, p.start_date DESC
+LIMIT 1
+```
+
+### Observability (Micrometer + Actuator)
+
+Metrics are collected at the service layer (`ApplicablePriceService`) to capture real business execution behaviour.
+
+| Metric | Description |
+|---|---|
+| `pricing.applicable_price.requests` | Total number of requests received |
+| `pricing.applicable_price.found` | Requests that returned a price |
+| `pricing.applicable_price.not_found` | Requests with no applicable price |
+| `pricing.applicable_price.validation_error` | Requests rejected due to invalid input |
+| `pricing.applicable_price.execution` | Execution time of the use case (timer) |
+
+**Actuator endpoints:**
+
+```bash
+GET /actuator/health
+GET /actuator/metrics
+GET /actuator/metrics/pricing.applicable_price.execution
+GET /actuator/caches
+```
+
+Example:
+
+```bash
+curl http://localhost:8080/actuator/metrics/pricing.applicable_price.execution
+```
 
 ---
 
@@ -315,7 +323,7 @@ cd pricing-engine-retail
 ./mvnw spring-boot:run
 ```
 
-The application starts on port `8080`. The H2 database is initialised automatically with the seed data on every startup.
+The application starts on port `8080`. The H2 database is initialised automatically with seed data on every startup.
 
 ### Build
 
@@ -335,7 +343,7 @@ java -jar target/pricing-engine-retail-0.0.1-SNAPSHOT.jar
 # Run tests and generate JaCoCo coverage report
 ./mvnw verify
 
-# View coverage report
+# Open coverage report
 open target/site/jacoco/index.html
 ```
 
@@ -343,7 +351,7 @@ open target/site/jacoco/index.html
 
 ## Test Coverage
 
-**100% across all metrics** — verified with JaCoCo.
+**100% across all metrics** — verified with JaCoCo 0.8.11.
 
 | Layer | Classes | Methods | Lines | Branches |
 |---|---|---|---|---|
@@ -354,19 +362,22 @@ open target/site/jacoco/index.html
 
 ### Test strategy
 
-The test suite is structured in five independent layers, each with a different scope and purpose:
+The suite is structured in six independent layers, each with a distinct scope and purpose.
 
-**Domain tests** (`PriceTest`) validate the invariants enforced in the `Price` compact constructor — null fields, invalid date ranges, and correct state exposure via record accessors.
+**Domain tests** (`PriceTest`) validate invariants enforced in the `Price` compact constructor: null fields, invalid date ranges, and correct state exposure via record accessors.
 
-**Use case tests** (`ApplicablePriceServiceTest`) are pure unit tests with Mockito. They cover correct mapping from `Price` to `ApplicablePriceResult`, argument propagation to the outbound port, exception messages, `BigDecimal` precision preservation, and all input validation branches.
+**Use case tests** (`ApplicablePriceServiceTest`) are pure unit tests with Mockito. They cover correct mapping from `Price` to `ApplicablePriceResult`, argument propagation to the outbound port, exception message content, `BigDecimal` precision preservation, and all input validation branches.
+
+**Telemetry tests** (`ApplicablePriceServiceTelemetryTest`) validate correct metric emission using `SimpleMeterRegistry`, ensuring accurate tracking of request volume, outcomes, and execution time without coupling to infrastructure.
 
 **Controller tests** (`PriceQueryControllerTest`) use `MockMvc` with `@WebMvcTest`. They cover all HTTP status codes (200, 400, 404, 500), parameter validation (missing, invalid format, zero, negative), `X-Correlation-Id` propagation, and structured log output via `OutputCaptureExtension`.
 
 **Persistence adapter tests** (`PricePersistenceAdapterTest`) verify entity-to-domain mapping using Mockito mocks — brand, product, currency, audit metadata, and inactive flag are all asserted.
 
-**JPA repository tests** (`PriceJpaRepositoryTest`) run against a real H2 instance with `@DataJpaTest`. They cover the five mandatory scenarios from the challenge specification, plus boundary conditions (inclusive start/end dates, inactive price exclusion via `@Sql`, fallback to base price after a promotional window closes, and empty results for unknown combinations).
+**Cache integration tests** (`PricePersistenceAdapterCacheIT`) run with `@SpringBootTest` and a mocked repository to assert that the cache is hit on the second call, with the JPA layer invoked only once.
 
-**Telemetry tests** validate the correct emission of metrics at the service layer using `SimpleMeterRegistry`, ensuring accurate tracking of request volume, outcomes, and execution time without coupling to infrastructure.
+**JPA repository tests** (`PriceJpaRepositoryTest`) run against a real H2 instance with `@DataJpaTest`. They cover the five mandatory challenge scenarios, plus boundary conditions: inclusive start/end dates, inactive price exclusion via `@Sql`, fallback to base price after a promotional window closes, and empty results for unknown combinations.
+
 ---
 
 ## Tech Stack
@@ -376,14 +387,15 @@ The test suite is structured in five independent layers, each with a different s
 | Language | Java 21 |
 | Framework | Spring Boot 3.3.5 |
 | Persistence | Spring Data JPA + H2 (in-memory) |
+| Caching | Caffeine |
 | Validation | Jakarta Validation (`@NotNull`, `@Positive`) |
 | Logging | SLF4J + Logback with MDC correlation tracking |
+| Observability | Micrometer + Spring Boot Actuator |
 | Boilerplate reduction | Lombok |
-| Testing | JUnit 5 · Mockito · MockMvc · `@DataJpaTest` |
+| Testing | JUnit 5 · Mockito · MockMvc · `@DataJpaTest` · `@SpringBootTest` |
 | Coverage | JaCoCo 0.8.11 |
 | Build | Maven 3 |
-| Observability | Micrometer + Spring Boot Actuator |
-| Caching | Caffeine |
+
 ---
 
 ## Project Structure
@@ -394,7 +406,8 @@ src/
 │   ├── java/com/bcnc/challenge/pricing/
 │   │   ├── PricingEngineRetailApplication.java
 │   │   ├── application/
-│   │   │   ├── exceptions/ApplicablePriceNotFoundException.java
+│   │   │   ├── exceptions/
+│   │   │   │   └── ApplicablePriceNotFoundException.java
 │   │   │   ├── ports/
 │   │   │   │   ├── in/GetApplicablePriceUseCase.java
 │   │   │   │   └── out/LoadApplicablePricePort.java
@@ -408,27 +421,27 @@ src/
 │   │   │       ├── Price.java
 │   │   │       └── Product.java
 │   │   └── infrastructure/
-│   │       └── adapters/
-│   │           ├── in/web/
-│   │           │   ├── PriceQueryController.java
-│   │           │   ├── filter/CorrelationIdFilter.java
-│   │           │   ├── handler/GlobalExceptionHandler.java
-│   │           │   └── response/
-│   │           │       ├── ApiErrorResponse.java
-│   │           │       ├── ApiResponse.java
-│   │           │       └── ApplicablePriceResponse.java
-│   │           └── out/persistence/
-│   │               ├── PriceJpaRepository.java
-│   │               ├── PricePersistenceAdapter.java
-│   │               └── entity/
-│   │                   ├── AuditableEntity.java
-│   │                   ├── BrandEntity.java
-│   │                   ├── CurrencyEntity.java
-│   │                   ├── PriceEntity.java
-│   │                   └── ProductEntity.java
-│   │       ├── config/
-│   │       │   ├── CacheConfig.java
-│   │       │   └── CacheKeyFactory.java
+│   │       ├── adapters/
+│   │       │   ├── in/web/
+│   │       │   │   ├── PriceQueryController.java
+│   │       │   │   ├── filter/CorrelationIdFilter.java
+│   │       │   │   ├── handler/GlobalExceptionHandler.java
+│   │       │   │   └── response/
+│   │       │   │       ├── ApiErrorResponse.java
+│   │       │   │       ├── ApiResponse.java
+│   │       │   │       └── ApplicablePriceResponse.java
+│   │       │   └── out/persistence/
+│   │       │       ├── PriceJpaRepository.java
+│   │       │       ├── PricePersistenceAdapter.java
+│   │       │       └── entity/
+│   │       │           ├── AuditableEntity.java
+│   │       │           ├── BrandEntity.java
+│   │       │           ├── CurrencyEntity.java
+│   │       │           ├── PriceEntity.java
+│   │       │           └── ProductEntity.java
+│   │       └── config/
+│   │           ├── CacheConfig.java
+│   │           └── CacheKeyFactory.java
 │   └── resources/
 │       ├── application.yaml
 │       ├── data.sql
@@ -436,21 +449,29 @@ src/
 └── test/
     └── java/com/bcnc/challenge/pricing/
         ├── PricingEngineRetailApplicationTest.java
-        ├── application/service/ApplicablePriceServiceTest.java
-        ├── domain/model/PriceTest.java
-        └── infrastructure/adapters/
-            ├── in/web/
-            │   ├── PriceQueryControllerTest.java
-            │   ├── handler/GlobalExceptionHandlerTest.java
-            │   └── response/ApiResponseTest.java
-            └── out/persistence/
-                ├── PriceJpaRepositoryTest.java
-                ├── PricePersistenceAdapterTest.java
-                └── entity/
-                    ├── AuditableEntityTest.java
-                    ├── BrandEntityTest.java
-                    ├── CurrencyEntityTest.java
-                    ├── PriceEntityTest.java
-                    └── ProductEntityTest.java
-           
+        ├── application/
+        │   └── service/
+        │       ├── ApplicablePriceServiceTest.java
+        │       └── ApplicablePriceServiceTelemetryTest.java
+        ├── domain/
+        │   └── model/PriceTest.java
+        └── infrastructure/
+            ├── adapters/
+            │   ├── in/web/
+            │   │   ├── PriceQueryControllerTest.java
+            │   │   ├── handler/GlobalExceptionHandlerTest.java
+            │   │   └── response/ApiResponseTest.java
+            │   └── out/persistence/
+            │       ├── PriceJpaRepositoryTest.java
+            │       ├── PricePersistenceAdapterCacheIT.java
+            │       ├── PricePersistenceAdapterTest.java
+            │       └── entity/
+            │           ├── AuditableEntityTest.java
+            │           ├── BrandEntityTest.java
+            │           ├── CurrencyEntityTest.java
+            │           ├── PriceEntityTest.java
+            │           └── ProductEntityTest.java
+            └── config/
+                ├── CacheConfigTest.java
+                └── CacheKeyFactoryTest.java
 ```
