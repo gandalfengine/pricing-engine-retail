@@ -4,7 +4,7 @@ spring:
     driver-class-name: org.h2.Driver
     username: ${DB_USERNAME:sa}
     password: ${DB_PASSWORD:}
-    Hikari:
+    hikari:
       maximum-pool-size: 10
       minimum-idle: 2
       connection-timeout: 30000
@@ -14,12 +14,6 @@ spring:
   h2:
     console:
       enabled: false
-
-  sql:
-    init:
-      mode: always
-      schema-locations: classpath:schema.sql
-      data-locations: classpath:data.sql
 
   jpa:
     hibernate:
